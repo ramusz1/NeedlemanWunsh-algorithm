@@ -35,7 +35,7 @@ def read_sequence(path, max_seq_length):
 
 if __name__ == '__main__':
 
-    parser = argparse.ArgumentParser(description='Run Needleman Wunsh algorithm on provided DNA sequences.')
+    parser = argparse.ArgumentParser(description='Run Needleman Wunsh algorithm on provided sequences.')
     parser.add_argument('-a', dest='seq_a', type=str, nargs=1, help='first input sequence path')
     parser.add_argument('-b', dest='seq_b', type=str, nargs=1, help='second input sequence path')
     parser.add_argument('-c', dest='config', type=str, nargs=1, help='config path')
