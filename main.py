@@ -1,70 +1,58 @@
-import numpy as np
+import argparse
+from solver import NeedlemanWunshSolver
+import configparser
+from collections import namedtuple
 
-def compare_sequences(a, b, same=5, diff=-5, gap_penalty=-2):
-    H = np.zeros((len(a)+1, len(b)+1))
-    # fill first row and column
-    H[0][0] = 0
-    for i in range(1, H.shape[0]):
-        H[0][i] = H[0][i-1] + gap_penalty
+
+def parse_config(path):
+    config = configparser.ConfigParser(delimiters=[' '])
+    config.read(path)
+
+    keys = ['GAP_PENALTY', 'SAME', 'DIFF', 'MAX_SEQ_LENGTH', 'MAX_NUMBER_PATHS']
+    parsed_config = {}
+    for key in keys:
+        if not key in config['DEFAULT']:
+            raise KeyError(f"key: {key} not found in config")
+        try:
+            parsed_config[key] = config.getint('DEFAULT', key)
+        except ValueError as e:
+            raise ValueError(f'could not parse value of key: {key} as an integer')
+
+    return parsed_config
+
+
+def read_sequence(path, max_seq_length):
+    with open(path, 'r') as f:
+        lines = f.readlines()
+        no_header = lines[1:]
+        sequence = ''.join(no_header)
+        sequence = sequence.replace('\n','')
+        if len(sequence) > max_seq_length:
+            raise ValueError('input sequence from file {path} is too long')
+
+        return sequence
+
+
+if __name__ == '__main__':
+
+    parser = argparse.ArgumentParser(description='Run Needleman Wunsh algorithm on provided DNA sequences.')
+    parser.add_argument('-a', dest='seq_a', type=str, nargs=1, help='first input sequence path')
+    parser.add_argument('-b', dest='seq_b', type=str, nargs=1, help='second input sequence path')
+    parser.add_argument('-c', dest='config', type=str, nargs=1, help='config path')
+    parser.add_argument('-o', dest='output_path', type=str, nargs=1, help='output path')
+
+    args = parser.parse_args()
     
-    for i in range(1, H.shape[1]):
-        H[i][0] = H[i-1][0] + gap_penalty
-
-    # init paths
-    paths = np.zeros( (H.shape[0], H.shape[1], 3 ) )
-
-    for i in range(1, H.shape[0]):
-        for j in range(1, H.shape[1]):
-            from_up = H[i - 1][j] + gap_penalty
-            from_left = H[i][j-1] + gap_penalty
-            if a[i-1] == b[j-1]:
-                from_diag = H[i-1][j-1] + same
-            else:
-                from_diag = H[i-1][j-1] + diff
-
-            H[i][j] = max(from_up, from_left, from_diag)
-            # TODO as function
-            paths[i][j] = np.array([from_up, from_left, from_diag]) == H[i][j]
-            
-    return H, paths
-
-def get_paths_from_directions(directions, seq_a, seq_b, curr_seq_a = '', curr_seq_b = '', pos=None):
-    if pos is None:
-        x, y = directions.shape[0] - 1, directions.shape[1] - 1
-    else:
-        x, y = pos
-
-    if x == 0 and y == 0:
-        print('a: ', curr_seq_a[::-1], '\nb: ', curr_seq_b[::-1], '\n')
-        return 
-
-    if x == 0:
-        # TODO
-        print('a: ', curr_seq_a[::-1], '\nb: ', curr_seq_b[::-1], '\n')
-        return 
+    try:
+        config = parse_config(args.config)
+        seq_a = read_sequence(args.seq_a[0], config['MAX_SEQ_LENGTH'])
+        seq_b = read_sequence(args.seq_b[0], config['MAX_SEQ_LENGTH'])    
+        solver = NeedlemanWunshSolver(config['SAME'], config['DIFF'], config['GAP_PENALTY'], config['MAX_NUMBER_PATHS'], args.output_path[0])
+        score_mat, directions = solver.find_score_matrix_with_directions(seq_a, seq_b)
+        solver.find_possible_alignments(directions, seq_a, seq_b)
     
-    if y == 0:
-        # TODO
-        print('a: ', curr_seq_a[::-1], '\nb: ', curr_seq_b[::-1], '\n')        
-        return
-
-    if directions[x][y][0]: # from up (first dim is height)
-        next_seq_a = curr_seq_a + seq_a[x-1]
-        next_seq_b = curr_seq_b + '_'
-        get_paths_from_directions(directions, seq_a, seq_b, next_seq_a, next_seq_b, (x-1, y))
-
-    if directions[x][y][1]: # from left (second dim is width)
-        next_seq_a = curr_seq_a + '_'
-        next_seq_b = curr_seq_b + seq_b[y-1]
-        get_paths_from_directions(directions, seq_a, seq_b, next_seq_a, next_seq_b, (x, y-1))
-        
-    if directions[x][y][2]: # from diag
-        next_seq_a = curr_seq_a + seq_a[x-1]
-        next_seq_b = curr_seq_b + seq_b[y-1]
-        get_paths_from_directions(directions, seq_a, seq_b, next_seq_a, next_seq_b, (x-1, y-1) )
+    except (KeyError, ValueError) as e:
+        print(e)
 
 
-seq_a = 'SUM'
-seq_b = 'SAM'
-H, directions = compare_sequences(seq_a, seq_b)
-get_paths_from_directions(directions, seq_a, seq_b)
+
